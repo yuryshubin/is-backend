@@ -1,0 +1,16 @@
+settings:
+  - If: '"${self:custom.offline}" == "true"'
+    Set:
+      functions.search.events: [ {
+        http: {
+          path: search,
+          method: get,
+          request: {
+            querystrings: {
+                criteria: true,
+                page: false,
+                limit: false
+            }
+          }
+        }
+      } ]

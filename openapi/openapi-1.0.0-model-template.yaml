@@ -1,0 +1,110 @@
+openapi: 3.0.0
+servers: [ ]
+info:
+  description: IntelliStyle Api
+  version: "1.0.0"
+  title: IntelliStyle Api
+  contact:
+    email: crusher83@gmail.com
+tags:
+  - name: search
+    description: Search operations
+paths:
+  /search:
+    get:
+      tags:
+        - search
+      summary: searches for item
+      operationId: search
+      x-amazon-apigateway-integration:
+        httpMethod: POST
+        type: aws_proxy
+        contentHandling: CONVERT_TO_TEXT
+        passthroughBehavior: when_no_templates
+        uri: >-
+          arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:855046591317:function:@@cloudformation-search/invocations
+        responses:
+          default:
+            statusCode: '200'
+      parameters:
+        - in: query
+          name: criteria
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: page
+          required: false
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: search results matching criteria
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResponse'
+        '400':
+          description: bad input parameter
+components:
+  schemas:
+    GarmentItem:
+      type: object
+      required:
+        - id
+        - productID
+        - url
+        - gender
+        - description
+        - image_urls
+        - title
+        - brand
+        - price
+        - currency
+        - stock
+      properties:
+        id:
+          type: string
+        productID:
+          type: number
+        url:
+          type: string
+        gender:
+          type: string
+        description:
+          type: string
+        image_urls:
+          type: array
+          items:
+            type: string
+        title:
+          type: string
+        brand:
+          type: string
+        price:
+          type: integer
+        currency:
+          type: string
+        stock:
+          type: integer
+
+    SearchResponse:
+      type: object
+      required:
+        - items
+        - currentPage
+        - totalPages
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/GarmentItem'
+        currentPage:
+          type: integer
+        totalPages:
+          type: integer

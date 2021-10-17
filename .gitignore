@@ -1,0 +1,7 @@
+.serverless
+node_modules
+src/.webpack
+**/*.js
+**/*.js.map
+!./webpack.config.js
+.build

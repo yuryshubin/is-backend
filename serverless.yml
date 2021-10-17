@@ -1,0 +1,129 @@
+#org: crusher83
+app: intellistyle-app
+service: intellistyle-be
+frameworkVersion: '2'
+unresolvedVariablesNotificationMode: error
+
+package:
+  individually: true
+
+plugins:
+  - serverless-plugin-ifelse # https://github.com/anantab/serverless-plugin-ifelse
+  - serverless-webpack # https://www.serverless.com/plugins/serverless-webpack
+  - serverless-offline # https://www.npmjs.com/package/serverless-offline
+#  - serverless-plugin-typescript # https://serverless.com/plugins/serverless-plugin-typescript/
+
+custom:
+  enterprise:
+    collectLambdaLogs: false
+
+  disableLogs: false
+
+  offline: ${opt:offline, 'false'}
+
+  ResourceName: ${self:service}
+  RoleName: ${self:custom.ResourceName}-role
+  LogGroup: ${self:custom.ResourceName}
+  LogStream: ${self:custom.ResourceName}
+  ApiVersion: '1.0.0'
+  ApiBasePath: 'v1'
+
+  webpack:
+    webpackConfig: ./webpack.config.js
+    excludeFiles: '**/*.ts'
+    keepOutputDirectory: true
+
+  serverlessIfElse: ${file(./serverlessIfElse.yml):settings}
+
+provider:
+  name: aws
+  stage: ${opt:stage}
+  stackName: ${self:service}
+  runtime: nodejs12.x
+  lambdaHashingVersion: 20201221
+  memorySize: 128
+  timeout: 30
+  logRetentionInDays: 7
+  versionFunctions: false
+  region: us-east-1
+  profile: personal
+  iam:
+    role: Role
+  deploymentBucket:
+    name: ys.serverless.deploys
+    blockPublicAccess: true
+  stackTags:
+    Name: ${self:app}
+  apiGateway:
+    shouldStartNameWithService: true
+    description: 'IntelliStyle'
+
+resources:
+  Resources:
+
+    Role:
+      Type: AWS::IAM::Role
+      Properties:
+        RoleName: ${self:custom.RoleName}
+        Path: /
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service:
+                  - lambda.amazonaws.com
+                  - apigateway.amazonaws.com
+              Action:
+                - sts:AssumeRole
+        Policies:
+          - PolicyName: custom
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow #1
+                  Action:
+                    - logs:CreateLogGroup
+                    - logs:CreateLogStream
+                    - logs:PutLogEvents
+                  Resource:
+                    - arn:aws:logs:us-east-1:855046591317:log-group:${self:custom.LogGroup}
+                    - arn:aws:logs:us-east-1:855046591317:log-group:${self:custom.LogGroup}:*
+                - Effect: Allow #2
+                  Action:
+                    - lambda:InvokeFunction
+                  Resource: "*"
+        ManagedPolicyArns:
+          - arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs
+          - arn:aws:iam::aws:policy/CloudWatchLogsFullAccess
+
+    ApiGatewayRestApi:
+      Type: AWS::ApiGateway::RestApi
+      Properties:
+        Name: ${self:service}-${self:custom.ApiVersion}
+        Body:
+          ${file(./openapi/openapi-${self:custom.ApiVersion}-model.yaml)}
+
+    ApiGatewayDeployment:
+      Type: AWS::ApiGateway::Deployment
+      Properties:
+        RestApiId:
+          Ref: ApiGatewayRestApi
+      DependsOn:
+        - ApiGatewayRestApi
+
+    ApiGatewayStage:
+      Type: AWS::ApiGateway::Stage
+      Properties:
+        StageName: ${self:provider.stage}
+        RestApiId:
+          Ref: ApiGatewayRestApi
+        DeploymentId:
+          Ref: ApiGatewayDeployment
+      DependsOn:
+        - ApiGatewayDeployment
+
+functions:
+  search:
+    handler: src/search.handler
+    disableLogs: ${self:custom.disableLogs}
